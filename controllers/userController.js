@@ -1,13 +1,13 @@
 import { catchAsyncError } from "../middlewares/catchAsyncError.js"
 import ErrorHandler from "../utils/errorHandler.js";
-import {User} from "../models/User.js"
+import {User} from "../models/User.js";
 import { sendToken } from "../utils/sendToken.js";
 import { sendEmail } from "../utils/sendEmail.js";
-import crypto from "crypto"
+import crypto from "crypto";
 import { Course } from "../models/Course.js";
-import cloudinary from "cloudinary"
+import cloudinary from "cloudinary";
 import getDataUri from "../utils/dataUri.js";
-import {Stats} from "../models/Stats.js"
+import {Stats} from "../models/Stats.js";
 
 
 export const  register = catchAsyncError(async(req,res,next)=>{
@@ -317,16 +317,30 @@ if(itemExist) return next(new ErrorHandler("Item ALready Exist",409))
 
  })
 
-
- User.watch().on("change",async()=>{
- const stats = await Stats.find({}).sort({createdAt:"desc"}).limit(1);
-
- const subscription = await User.find({"subscription.status":"active"});
-
- stats[0].users= await User.countDocuments();
- stats[0].subscription=subscription.length;
- stats[0].createdAt=new Date(Date.now());
-
- await stats.save();
-
- })
+ 
+ User.watch().on("change", async () => {
+   try {
+     const stats = await Stats.find({}).sort({ createdAt: "desc" }).limit(1);
+ 
+     const subscription = await User.find({ "subscription.status": "active" });
+ 
+     const updatedStats = {
+       users: await User.countDocuments(),
+       subscription: subscription.length,
+       createdAt: new Date(Date.now())
+     };
+ 
+     if (stats[0]) {
+       // If stats exist, update them
+       stats[0].set(updatedStats);
+       await stats[0].save();
+     } else {
+       // If no stats exist, create a new entry
+       const newStats = new Stats(updatedStats);
+       await newStats.save();
+     }
+   } catch (error) {
+     console.error('Error processing User change:', error);
+   }
+ });
+ 
