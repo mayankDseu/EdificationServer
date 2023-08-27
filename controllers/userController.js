@@ -275,7 +275,7 @@ if(itemExist) return next(new ErrorHandler("Item ALready Exist",409))
 
     res.status(200).json({
         success:true,
-        message:"Roel Updated"
+        message:"Role Updated"
     })
 
  })
