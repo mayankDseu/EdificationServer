@@ -6,26 +6,46 @@ import ErrorHandler from "../utils/errorHandler.js";
 import  cloudinary from "cloudinary";
 import {Stats} from "../models/Stats.js"
 
-export const getAllCourses=catchAsyncError(async(req,res,next)=>{
-  
-  const keyword= req.query.keyword||"";
-  const category= req.query.category||"";
-  
-  
-   const courses= await Course.find({
-      title:{
-         $regex:keyword,
-         $options:"i",
-      },category:{
-         $regex:category,
-         $options:"i",
-      },
-   }).select("-lectures");
-   res.status(200).json({
-    success:true,
-    courses,
+export const getAllCourses = catchAsyncError(async (req, res, next) => {
+   const keyword = req.query.keyword || "";
+   const category = req.query.category || "";
+   const page = parseInt(req.query.page) || 1;
+   const limit = parseInt(req.query.limit) || 6;
+ 
+   const courses = await Course.find({
+     title: {
+       $regex: keyword,
+       $options: "i",
+     },
+     category: {
+       $regex: category,
+       $options: "i",
+     },
    })
-})
+     .sort({ createdAt: -1 })
+     .skip((page - 1) * limit)
+     .limit(limit)
+     .select("-lectures");
+ 
+   const totalCourses = await Course.countDocuments({
+     title: {
+       $regex: keyword,
+       $options: "i",
+     },
+     category: {
+       $regex: category,
+       $options: "i",
+     },
+   });
+ 
+   res.status(200).json({
+     success: true,
+     courses,
+     totalPages: Math.ceil(totalCourses / limit),
+     currentPage: page,
+   });
+ });
+ 
 
 
 export const createCourse=catchAsyncError(async(req,res,next)=>{
@@ -49,7 +69,7 @@ export const createCourse=catchAsyncError(async(req,res,next)=>{
       poster:{
          public_id:mycloud.public_id,
          url:mycloud.secure_url,
-      },
+         },
    })
 
 
@@ -60,6 +80,7 @@ export const createCourse=catchAsyncError(async(req,res,next)=>{
     message:"Course Created Successfully. You can add lectures now",
    })
 })
+
 
 
 
@@ -85,12 +106,12 @@ export const addLecture=catchAsyncError(async(req,res,next)=>{
    const {title,description}=req.body;
    
 
-   const course= await Course.findById(req.params.id)
+   const course= await Course.findById(id);
    if(!course) return next (new ErrorHandler("Course Not Found"),404)
    
    //uplad file here
 
-   const file=req.file;
+/*    const file=req.file;
 
 
    const fileUri=getDataUri(file)
@@ -99,18 +120,19 @@ export const addLecture=catchAsyncError(async(req,res,next)=>{
    resource_type:'video'
    });
 
-
+ */
    course.lectures.push({
       title,
       description,
-      video:{
+      /* video:{
          public_id:mycloud.public_id,
          url:mycloud.secure_url,
-      }
+      } */
    });
 
    course.numOfVideos=course.lectures.length;
 
+  
    await course.save();
    
    
@@ -150,6 +172,8 @@ await course.deleteOne();
 
 
 
+
+
 export const deleteLecture =catchAsyncError(async(req,res,next)=>{
    const {courseId,lectureId}= req.query;
 
@@ -157,20 +181,8 @@ export const deleteLecture =catchAsyncError(async(req,res,next)=>{
 
    if(!course) return next (new ErrorHandler("Course Not Found"),404)
 
-   const lecture = course.lectures.find((item)=>{
-      if(item._id.toString()===lectureId.toString()) return item;
+      course.lectures = course.lectures.filter((item) => item._id.toString() !== lectureId.toString());
 
-   })
-
-   await cloudinary.v2.uploader.destroy(lecture.video.public_id,{
-      resource_type:"video",
-
-   })
-
-   course.lectures= course.lectures.filter((item)=>{
-      if(item._id.toString() !== lectureId.toString()) return item;
-
-   })
 
    course.numOfVideos=course.lectures.length;
 
@@ -181,6 +193,44 @@ export const deleteLecture =catchAsyncError(async(req,res,next)=>{
     message:"Lecture Deleted Successfully." ,
    })
 })
+
+
+
+
+export const editLecture = catchAsyncError(async (req, res, next) => {
+  const { courseId, lectureId } = req.query;
+  const { title, description } = req.body; // Assuming you are sending these fields to update
+  
+  if (!courseId || !lectureId) {
+    return next(new ErrorHandler("Course ID and Lecture ID are required", 400));
+  }
+
+  const course = await Course.findById(courseId);
+
+  if (!course) {
+    return next(new ErrorHandler("Course Not Found", 404));
+  }
+
+  const lecture = course.lectures.find((item) => item._id.toString() === lectureId.toString());
+
+  if (!lecture) {
+    return next(new ErrorHandler("Lecture Not Found", 404));
+  }
+
+  // Update the lecture fields
+  lecture.title = title || lecture.title;
+  lecture.description = description || lecture.description;
+
+  await course.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Lecture Updated Successfully.",
+    lectures: lecture // Optionally return the updated lecture
+  });
+});
+
+ 
 
 
 Course.watch().on("change", async () => {
