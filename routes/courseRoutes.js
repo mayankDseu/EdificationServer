@@ -16,7 +16,11 @@ router.route("/createcourse").post(isAuthenticated,authorizeAdmin,singleUpload,c
 
 // add lectures, delete courses, get courses details
 
+<<<<<<< HEAD
 router.route("/course/:id").get(getCourseLectures).post(
+=======
+router.route("/course/:id").get(isAuthenticated,authorizeAdmin,getCourseLectures).post(
+>>>>>>> b5676d0d3ab91507bd2e2dab6be94aadaa53b8aa
     isAuthenticated,authorizeAdmin,singleUpload,addLecture
 ).delete(isAuthenticated,authorizeAdmin,deleteCourse);
 
